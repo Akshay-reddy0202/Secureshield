@@ -17,14 +17,14 @@ api.interceptors.response.use(
         try {
           const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refresh_token });
           const { access_token, refresh_token: new_refresh, user: new_user } = res.data;
-          
+
           localStorage.setItem('ssa_user', JSON.stringify(new_user));
           localStorage.setItem('ssa_access_token', access_token);
           localStorage.setItem('ssa_refresh_token', new_refresh);
-          
+
           api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
           originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-          
+
           return api(originalRequest);
         } catch (err) {
           localStorage.removeItem('ssa_user');

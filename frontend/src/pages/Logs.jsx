@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { ShieldCheck, AlertTriangle, Search, Filter, Cpu, Loader2 } from 'lucide-react';
 
 export default function LogsPage() {
@@ -8,7 +8,7 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/logs')
+    api.get('/logs')
       .then(res => {
         // Map raw mongo documents to UI format
         const formattedLogs = res.data.logs.map(log => {

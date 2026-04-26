@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ShieldAlert, ShieldCheck, Activity, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/metrics')
+    api.get('/metrics')
       .then(res => {
         const formattedChartData = res.data.chartData?.map(item => ({
           ...item,

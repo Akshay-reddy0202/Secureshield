@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import LayersPanel from '../components/chat/LayersPanel';
 import ChatBox from '../components/chat/ChatBox';
 
@@ -11,7 +11,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     // Load historical chats on page mount
-    axios.get('http://127.0.0.1:8000/chat/history')
+    api.get('/chat/history')
       .then(res => {
         setMessages(res.data);
       })
@@ -30,7 +30,7 @@ export default function ChatPage() {
 
     try {
       // 3. Hit the backend
-      const res = await axios.post(`http://127.0.0.1:8000/chat`, { message: input });
+      const res = await api.post(`/chat`, { message: input });
       const data = res.data;
 
       // 4. Handle response
@@ -71,7 +71,7 @@ export default function ChatPage() {
     if (!window.confirm("Are you sure you want to clear your chat history? This cannot be undone.")) return;
 
     try {
-      await axios.delete('http://127.0.0.1:8000/chat/history');
+      await api.delete('/chat/history');
       setMessages([]);
     } catch (err) {
       console.error("Failed to clear history:", err);

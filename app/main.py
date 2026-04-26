@@ -58,7 +58,7 @@ chat_db = client["SSA_Security"]["chats"]
 # 2. Add CORS Middleware (Crucial for Frontend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS_LIST, 
+    allow_origins=["*"], 
     allow_methods=["*"],
     allow_headers=["*"],
 )
