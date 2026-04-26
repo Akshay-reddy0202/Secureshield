@@ -1,0 +1,34 @@
+# SecureShield V2 Core
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+python-dotenv
+uuid
+bcrypt==3.2.0
+passlib[bcrypt]
+PyJWT
+
+# AI & Structured Output
+openai
+instructor
+google-generativeai
+
+# Security Guards (PII & Anonymization)
+presidio-analyzer
+presidio-anonymizer
+spacy
+
+# Logging & Database
+motor
+dnspython
+
+# Semantic Intent Layer
+
+
+# python -m pip install -r requirements.txt
+# python -m app.main
+
+
+# cd frontend
+# npm run dev
