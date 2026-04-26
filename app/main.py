@@ -59,8 +59,8 @@ chat_db = client["SSA_Security"]["chats"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # local frontend
-        "https://your-app.vercel.app"  # deployed frontend
+        "http://localhost:5173", 
+        "https://secureshield-rho-two.vercel.app"  
     ],
     allow_credentials=True,
     allow_methods=["*"],
