@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [role, setRole] = useState('Employee');
   const [department, setDepartment] = useState('IOT');
@@ -133,14 +134,23 @@ export default function Login() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700/50 rounded-lg p-3 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                placeholder="••••••••"
-                required
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700/50 rounded-lg p-3 pr-10 text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button 
