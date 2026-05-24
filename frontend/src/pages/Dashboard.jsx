@@ -119,6 +119,62 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* Dynamic Security Metrics */}
+      {(metrics.riskDistribution || metrics.attackTrends?.length > 0 || metrics.layerStats?.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-none pb-6">
+          {/* Risk Distribution */}
+          {metrics.riskDistribution && (
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.5)]">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Risk Distribution</h2>
+              <div className="flex justify-between items-center text-sm px-2">
+                <div className="flex flex-col items-center">
+                  <span className="text-emerald-500 font-bold text-xl">{metrics.riskDistribution.LOW || 0}</span>
+                  <span className="text-slate-500 font-medium text-xs mt-1">LOW</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-amber-500 font-bold text-xl">{metrics.riskDistribution.MEDIUM || 0}</span>
+                  <span className="text-slate-500 font-medium text-xs mt-1">MEDIUM</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-rose-500 font-bold text-xl">{metrics.riskDistribution.HIGH || 0}</span>
+                  <span className="text-slate-500 font-medium text-xs mt-1">HIGH</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Attack Trends */}
+          {metrics.attackTrends && metrics.attackTrends.length > 0 && (
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.5)] max-h-64 overflow-y-auto">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Attack Trends</h2>
+              <ul className="space-y-3">
+                {metrics.attackTrends.map((trend, i) => (
+                  <li key={i} className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600 dark:text-slate-400 truncate pr-2">{trend.name}</span>
+                    <span className="font-semibold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-900 dark:text-slate-200 shrink-0">{trend.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Layer Stats */}
+          {metrics.layerStats && metrics.layerStats.length > 0 && (
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.5)] max-h-64 overflow-y-auto">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Layer Statistics</h2>
+              <ul className="space-y-3">
+                {metrics.layerStats.map((layer, i) => (
+                  <li key={i} className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600 dark:text-slate-400 truncate pr-2">{layer.name}</span>
+                    <span className="font-semibold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-900 dark:text-slate-200 shrink-0">{layer.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

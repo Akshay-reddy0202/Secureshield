@@ -40,7 +40,7 @@ export default function ChatPage() {
         setBlockedReason(data.reason);
         setMessages(prev => [...prev, {
           role: 'system',
-          content: 'Payload intercepted and destroyed by security pipeline.',
+          content: `🛡️ BLOCKED: ${data.reason}`,
           status: 'BLOCKED',
           reason: data.reason
         }]);

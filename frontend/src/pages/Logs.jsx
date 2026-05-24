@@ -10,7 +10,6 @@ export default function LogsPage() {
   useEffect(() => {
     api.get('/logs')
       .then(res => {
-        // Map raw mongo documents to UI format
         const formattedLogs = res.data.logs.map(log => {
           let layer = 'System';
           let status = 'PASSED';
