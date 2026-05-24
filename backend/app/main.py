@@ -1,7 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="instructor.providers.gemini")
 
-from fastapi import FastAPI, Query, HTTPException, Depends
+from fastapi import FastAPI, Query, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
+# Force Uvicorn Reload for Policy Engine updates
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import uuid
@@ -33,21 +35,49 @@ def simple_langsmith_logger(user_input, risk_score, decision, final_response):
             "decision": decision,
             "final_response": final_response
         }
-        with open("simple_audit.log", "a") as f:
+        with open("../logs/simple_audit.log", "a") as f:
             f.write(json.dumps(log_entry) + "\n")
     except Exception as e:
         print(f"Logging error: {e}")
 
+import re
+
 async def apply_guardrails(response_text: str) -> str:
     """Apply Guardrails after LLM response. Fail-safe."""
+    original_text = response_text
     try:
-        # Placeholder for actual guardrails logic
-        # e.g., guard = Guard.from_string(...)
-        # return guard.parse(response_text)
-        return response_text
+        patterns = {
+            "JWT_TOKEN": r"eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+",
+            "API_KEY": r"sk-[a-zA-Z0-9]{20,}",
+            "AWS_KEY": r"AKIA[0-9A-Z]{16}",
+            "GENERIC_SECRET": r"(?i)(?:api_key|apikey|access_token|secret_key)[=:\s]+['\"]?([a-zA-Z0-9\-_]{32,})['\"]?"
+        }
+        
+        redacted_text = original_text
+        total_findings = 0
+        
+        for secret_type, pattern in patterns.items():
+            matches = list(re.finditer(pattern, original_text))
+            if matches:
+                total_findings += len(matches)
+                for match in matches:
+                    if match.lastindex and match.lastindex >= 1:
+                        # Replace the captured group
+                        redacted_text = redacted_text.replace(match.group(1), f"[REDACTED_{secret_type}]")
+                    else:
+                        redacted_text = redacted_text.replace(match.group(0), f"[REDACTED_{secret_type}]")
+                
+        # Block only if severe (e.g. 3 or more secrets leaked)
+        if total_findings >= 3:
+            raise ValueError(f"Severe output violation: {total_findings} secrets detected")
+            
+        return redacted_text
+    except ValueError as ve:
+        # Re-raise so the pipeline can catch and block it
+        raise ve
     except Exception as e:
         print(f"Guardrails error: {e}")
-        return response_text # Fail-safe
+        return original_text # Fallback: return original output
 # ---------------------------------
 
 # 1. Initialize App
@@ -60,12 +90,52 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173", 
-        "https://secureshield-rho-two.vercel.app"  
+        "https://secureshield-rho-two.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- NEW: NETWORK GUARD (RATE LIMITING) ---
+import time
+
+NETWORK_RATE_LIMIT_COUNT = 30
+NETWORK_RATE_LIMIT_WINDOW_SECONDS = 60
+ip_request_counts = {}
+
+@app.middleware("http")
+async def network_guard_middleware(request: Request, call_next):
+    try:
+        path = request.url.path
+        if path == "/" or path.startswith("/health"):
+            return await call_next(request)
+            
+        client_ip = request.client.host if request.client else "unknown"
+        current_time = time.time()
+        
+        if client_ip not in ip_request_counts:
+            ip_request_counts[client_ip] = []
+            
+        # Clean up old requests
+        ip_request_counts[client_ip] = [
+            t for t in ip_request_counts[client_ip] 
+            if current_time - t < NETWORK_RATE_LIMIT_WINDOW_SECONDS
+        ]
+        
+        if len(ip_request_counts[client_ip]) >= NETWORK_RATE_LIMIT_COUNT:
+            return JSONResponse(
+                status_code=200,
+                content={"status": "BLOCKED", "reason": "Too many requests detected"}
+            )
+            
+        ip_request_counts[client_ip].append(current_time)
+        return await call_next(request)
+        
+    except Exception as e:
+        print(f"Network Guard Error: {e}")
+        return await call_next(request)
+# ------------------------------------------
 
 @app.on_event("startup")
 async def setup_data_retention():
@@ -146,15 +216,39 @@ async def clear_chat_history(current_user: dict = Depends(get_current_user)):
     await chat_db.delete_many({"user_email": current_user["email"]})
     return {"status": "success", "message": "History cleared"}
 
+from app.services.logger import audit_collection
+from app.services.attack_analyzer import analyze_attack
+
+async def _append_attack_analysis(request_id: str, current_user: dict, response: dict, client_ip: str = None) -> dict:
+    try:
+        doc = await audit_collection.find_one({"request_id": request_id})
+        pipeline_events = doc.get("pipeline_events", []) if doc else []
+        analysis = analyze_attack(pipeline_events, user_email=current_user.get("email"), ip_address=client_ip)
+        if analysis:
+            response["attack_analysis"] = analysis
+            await audit_collection.update_one(
+                {"request_id": request_id},
+                {"$set": {
+                    "attack_type": analysis.get("attack_type"),
+                    "entry_point": analysis.get("entry_point"),
+                    "risk_level": analysis.get("risk_level"),
+                    "root_cause": analysis.get("root_cause")
+                }}
+            )
+    except Exception as e:
+        print(f"Attack Analyzer Failed: {e}")
+    return response
+
 @app.post("/chat")
-async def chat_endpoint(data: ChatMessageModel, current_user: dict = Depends(get_current_user)):
+async def chat_endpoint(request: Request, data: ChatMessageModel, current_user: dict = Depends(get_current_user)):
     start_time = datetime.utcnow()
     request_id = str(uuid.uuid4())
     message = data.message
     role = current_user["role"]
+    client_ip = request.client.host if hasattr(request, "client") and request.client else "unknown"
     
     # 1. Initialize the audit trail for this request
-    await init_audit_log(request_id, current_user)
+    await init_audit_log(request_id, current_user, ip_address=client_ip)
 
     # Save User Context in chat history
     await chat_db.insert_one({"user_email": current_user["email"], "role": "user", "content": message, "timestamp": datetime.utcnow()})
@@ -169,14 +263,15 @@ async def chat_endpoint(data: ChatMessageModel, current_user: dict = Depends(get
         latency = (datetime.utcnow() - start_time).total_seconds() * 1000
         await finalize_audit_log(request_id, "BLOCKED", int(latency))
         
-        system_msg = {"user_email": current_user["email"], "role": "system", "content": "Payload intercepted and destroyed.", "status": "BLOCKED", "reason": reason, "timestamp": datetime.utcnow()}
+        system_msg = {"user_email": current_user["email"], "role": "system", "content": f"🛡️ BLOCKED: {reason}", "status": "BLOCKED", "reason": reason, "timestamp": datetime.utcnow()}
         await chat_db.insert_one(system_msg.copy())
         
         # --- NEW: SIMPLE LOGGING ---
         simple_langsmith_logger(message, 1.0, "BLOCK", f"Blocked by {layer}: {reason}")
         # ---------------------------
         
-        return {"status": "BLOCKED", "reason": reason}
+        response = {"status": "BLOCKED", "reason": reason}
+        return await _append_attack_analysis(request_id, current_user, response, client_ip)
 
     # Pipeline Checks
     import asyncio
@@ -185,7 +280,7 @@ async def chat_endpoint(data: ChatMessageModel, current_user: dict = Depends(get
         return await block_and_return("Forbidden pattern detected (Static Input Guard)", "INPUT_GUARD")
     await log_pipeline_event(request_id, "INPUT_GUARD", "PASSED")
     
-    if not await check_policy(normalized_message, role): 
+    if not await check_policy(normalized_message, role, current_user.get("department")): 
         return await block_and_return("Role-based policy violation (Policy Engine)", "POLICY_ENGINE")
     await log_pipeline_event(request_id, "POLICY_ENGINE", "PASSED")
     
@@ -238,12 +333,13 @@ async def chat_endpoint(data: ChatMessageModel, current_user: dict = Depends(get
         simple_langsmith_logger(message, risk_score, "ALLOW", final_response)
         # ---------------------------
         
-        return {
+        response = {
             "status": "PASSED", 
             "original_message": message,
             "response": final_response,
             "is_safe_check": llm_output.is_safe
         }
+        return await _append_attack_analysis(request_id, current_user, response, client_ip)
     except Exception as e:
         print(f"LLM GENERATION ERROR: {str(e)}")
         return await block_and_return(f"LLM failed to generate response: {str(e)}", "LLM_ENGINE")
@@ -317,7 +413,7 @@ async def get_metrics(current_user: dict = Depends(require_any_admin)):
     blocked = await db["logs"].count_documents({**query, "final_status": "BLOCKED"})
     safe = total - blocked
     
-    # Chart Data
+    # Chart Data & Stats
     cursor = db["logs"].find(query).sort("timestamp", 1).limit(1000)
     logs = await cursor.to_list(length=1000)
     
@@ -328,9 +424,28 @@ async def get_metrics(current_user: dict = Depends(require_any_admin)):
         iso_key = h_obj.strftime("%Y-%m-%dT%H:00:00Z")
         grouped[iso_key] = {"safe": 0, "blocked": 0}
 
+    risk_distribution = {"LOW": 0, "MEDIUM": 0, "HIGH": 0}
+    attack_trends = defaultdict(int)
+    layer_stats = defaultdict(int)
+
     for l in logs:
         ts = l.get("timestamp")
         if not ts: continue
+        
+        # New Stats Processing
+        risk = l.get("risk_level")
+        if risk in risk_distribution:
+            risk_distribution[risk] += 1
+            
+        attack = l.get("attack_type")
+        if attack:
+            attack_trends[attack] += 1
+            
+        for ev in l.get("pipeline_events", []):
+            layer = ev.get("layer")
+            if layer:
+                layer_stats[layer] += 1
+
         try:
             date_obj = ts if isinstance(ts, datetime) else datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
             iso_key = date_obj.strftime("%Y-%m-%dT%H:00:00Z")
@@ -342,6 +457,8 @@ async def get_metrics(current_user: dict = Depends(require_any_admin)):
                 grouped[iso_key]["safe"] += 1
 
     chart_data = [{"time": k, "safe": v["safe"], "blocked": v["blocked"]} for k,v in grouped.items()]
+    attack_trends_list = [{"name": k, "value": v} for k, v in attack_trends.items()]
+    layer_stats_list = [{"name": k, "value": v} for k, v in layer_stats.items()]
     
     # Recent Activity Map (using pipeline events)
     recent_cursor = db["logs"].find(query).sort("timestamp", -1).limit(4)
@@ -388,7 +505,10 @@ async def get_metrics(current_user: dict = Depends(require_any_admin)):
         "blocked": blocked,
         "viewer_scope": "Global" if is_super else current_user["department"],
         "chartData": chart_data,
-        "recentActivity": recent_activity
+        "recentActivity": recent_activity,
+        "riskDistribution": risk_distribution,
+        "attackTrends": attack_trends_list,
+        "layerStats": layer_stats_list
     }
 
 # 6. Entry Point

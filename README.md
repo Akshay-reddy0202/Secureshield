@@ -1,36 +1,111 @@
-🛡️ SecureShield AI Gateway
-Enterprise-Grade AI Security Middleware
-SecureShield AI acts as an intelligent "bouncer" for Large Language Models (LLMs). By positioning itself as a middleware layer between employees and external AI models (like Llama, GPT, or Gemini), SecureShield enforces data governance, prevents prompt injection, and scrubs PII in real-time.
-🏗️ Architecture: The "Defense-in-Depth" Pipeline
-SecureShield processes every request through a sequence of hardened layers to ensure no malicious or sensitive data leaves the organization:
-Normalization (Layer 0): Sanitizes Unicode and standardizes text to prevent bypass attacks.
-Input Guard (Layer 1): Real-time pattern matching for malicious signatures (Injection/Jailbreak detection).
-Policy Engine (Layer 2): Role-Based Access Control (RBAC) ensuring users only query authorized topics.
-Toxicity Guard (Layer 2.5): Filters aggressive or non-professional language.
-PII Redaction (Layer 3): Uses Microsoft Presidio to automatically scrub sensitive data (emails, phones) from prompts.
-LLM Handler (Layer 4): Connects to any LLM via OpenRouter, utilizing Instructor to enforce structured JSON responses.
-Output Guard (Layer 5): Final sanitization sweep on the AI's response before it returns to the user.
-🚀 Key Technical Features
-Plug & Play: Architecture is decoupled; switch LLMs or Security Guards without touching core logic.
-Asynchronous Processing: Built with FastAPI and Motor (MongoDB) to handle high-concurrency enterprise traffic without latency.
-Enterprise Auditability: Every interaction is timestamped, tagged, and saved to MongoDB, providing an immutable audit trail for compliance (SOC2/GDPR readiness).
-Resilient Design: Implements "Fail-Secure" defaults—if a layer fails, the request is blocked by default.
-🛠️ Technology Stack
-Backend: Python 3.12, FastAPI, Uvicorn
-AI Integration: Instructor, OpenRouter (Llama 3.1 / Gemma 2)
-Security: Microsoft Presidio, Spacy, Custom Regex Logic
-Persistence: MongoDB (with Async Driver)
-Frontend: React, Vite, Tailwind CSS, Lucide-React
-📊 Project Status
+# 🛡️ SecureShield AI Gateway
+An enterprise-grade AI security middleware and proxy that acts as an intelligent "bouncer" for Large Language Models (LLMs), enforcing data governance, preventing prompt injection, and scrubbing PII in real-time.
 
-Backend Pipeline & Middleware Logic
+🌟 Features
+- **⚡ Multi-Layered Security Pipeline**: Requests pass through Unicode Normalization, Input Guard, RBAC Policy Engine, Toxicity Guard, Semantic Guard, and PII Redaction.
+- **🛡️ Active Rate Limiting (Network Guard)**: Middleware rate limiter to restrict request velocity and defend against DDoS attacks.
+- **👤 Role-Based Access Control (RBAC)**: Fine-grained, department-level prompt safety policies (e.g., HR, Finance, and general employee constraints).
+- **🤖 LLM-as-a-Judge Auditing**: Concurrently evaluates prompt toxicity and semantic jailbreak attempts using high-speed cloud LLMs.
+- **🔍 Advanced PII Redaction**: Scrubs emails, phone numbers, API keys, and corporate vault secrets using spaCy, Microsoft Presidio, and custom regex pattern lists.
+- **🔐 Secrets Leak Protection (Output Guard)**: Scans AI responses for leaked JWT tokens, API keys, and server credentials before they leave the gateway.
+- **📊 Admin Monitoring Dashboard**: Visualizes operational traffic, threat analytics, risk distribution graphs, attack correlation trends, and recent activity logs.
 
-RBAC & PII Redaction
+🛠️ Tech Stack
+### Frontend
+- **React.js & Vite** - Modern, responsive web interface
+- **Tailwind CSS** - Sleek, flexible, and premium dark-mode custom styles
+- **Recharts** - Dynamic data visualization for traffic and threats
+- **Framer Motion** - Fluid micro-animations and page transitions
 
-Audit Logging (MongoDB Atlas/Local)
+### Backend
+- **Python 3.12** - Core backend runtime
+- **FastAPI & Uvicorn** - High-concurrency asynchronous endpoints
+- **MongoDB & Motor** - Asynchronous database driver for logging, policies, and users
 
-Frontend Dashboard (Real-time monitoring)
-One final thought before you ship:
-You have built a Professional Asset.
-If you are presenting this: Spend 30 seconds on the code, and 2 minutes on the "Why." (Why did you build this? To solve the enterprise data leakage problem).
-Confidence: If they ask you "Why did you use MongoDB instead of SQL?", tell them: "Because security logs are high-velocity and semi-structured; MongoDB's document model handles this type of telemetry 10x more efficiently than a relational table."
+### AI / Security / NLP
+- **Instructor** - Strict JSON structural output enforcement
+- **OpenRouter API** - Gateway connection to model providers (`Llama 3.1 8b`, `Gemini 2.0 Flash`)
+- **Microsoft Presidio & spaCy** - Highly optimized NLP-based anonymization
+- **Lakera Guard API** - Advanced third-party prompt injection analyzer
+
+Project Structure
+```
+SecureShield-AI/
+├── backend/             # FastAPI backend
+│   ├── app/             # Server core directories
+│   │   ├── layers/      # 6 pipeline security layers
+│   │   ├── services/    # DB, users, logging, and AI handlers
+│   │   └── config.py    # Environment settings
+│   ├── tests/           # Pipeline test suites
+│   ├── .env.example     # Configuration template
+│   └── requirements.txt # Python dependencies
+├── frontend/            # React + Vite frontend
+│   ├── src/             # Frontend source files
+│   │   ├── pages/       # Dashboard, chat, logs, settings
+│   │   └── components/  # Charts, layout, and pipeline simulator
+│   └── package.json     # Node.js dependencies
+└── README.md            # Project documentation
+```
+
+⚙️ Installation
+
+1️⃣ Clone the Repository
+```bash
+git clone <PRIVATE_URL>
+cd SecureShield-AI
+```
+
+2️⃣ Setup Backend
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows
+.venv\Scripts\activate
+# Linux/Mac
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start FastAPI server
+python -m app.main
+```
+Backend runs on: `http://localhost:8000`
+
+3️⃣ Setup Frontend
+```bash
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Start Vite dev server
+npm run dev
+```
+Frontend runs on: `http://localhost:5173`
+
+🔥 How It Works
+1. **Submit Prompt**: A user submits a query via the chat dashboard.
+2. **Standardize & Intercept**: Network rate limits apply and Unicode normalizes characters to prevent bypasses.
+3. **Policy & Intent Scan**: Role-based access controls and concurrent LLM judges scan for malicious prompt injection or toxic content.
+4. **PII Scrubbing**: SpaCy, Presidio, and the corporate vault redact emails, phone numbers, and keys.
+5. **Secure Dispatch**: The clean, safe prompt is forwarded to the backend LLM brain.
+6. **Response Audit**: The response is validated to block or scrub secret leakage before hitting the user interface.
+
+🚀 Future Enhancements
+- **Active Firewall Blocking**: Real-time IP banning for users triggering recurrent high-severity security threats.
+- **Exportable PDF Reports**: Automated SOC2/GDPR compliance reporting.
+- **Unified SIEM Integrations**: Export security telemetry straight to Splunk or Datadog.
+- **Multi-Model Routing**: Intelligently dispatch safe prompts to different models depending on tasks and cost optimization.
+
+🤝 Contributing
+Contributions are welcome!
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/NewFeature`)
+3. Commit your changes (`git commit -m 'Add NewFeature'`)
+4. Push to the branch (`git push origin feature/NewFeature`)
+5. Open a Pull Request
